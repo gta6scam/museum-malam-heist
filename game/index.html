@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Museum Malam: Mahkota Firaun — Heist Game</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0a14;
+    font-family: Georgia, 'Times New Roman', serif; color: #f2ead8; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .panel { background: rgba(10, 8, 20, 0.82); border: 1px solid #c9a227; border-radius: 8px;
+    padding: 8px 12px; box-shadow: 0 2px 14px rgba(0,0,0,0.55); }
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; font-size: 15px; }
+  #hud-top-left { position: absolute; top: 10px; left: 10px; line-height: 1.45; min-width: 168px; }
+  #hud-top-left b { color: #ffd700; }
+  #hud-alarm { position: absolute; top: 10px; left: 196px; width: 210px; }
+  #hud-alarm .label { display: flex; justify-content: space-between; font-size: 13px; letter-spacing: 1px; }
+  #alarm-bar { height: 12px; background: #2a2438; border: 1px solid #c9a227; border-radius: 6px; margin-top: 4px; overflow: hidden; }
+  #alarm-fill { height: 100%; width: 0%; background: #2dff7a; transition: width 0.15s linear; }
+  #hud-guards { position: absolute; top: 10px; right: 10px; max-width: 340px; font-size: 13px; color: #ffb020; text-align: right; }
+  #hud-mute { position: absolute; top: 64px; right: 10px; font-size: 12px; color: #b8b0a2; }
+  #banner { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); display: none;
+    background: rgba(20, 10, 10, 0.88); border: 1px solid #ff2a2a; color: #ffd700;
+    font-size: 17px; padding: 8px 18px; border-radius: 8px; white-space: nowrap; }
+  #hud-hint { position: absolute; bottom: 12px; left: 12px; font-size: 14px; color: #f2ead8; }
+  #minimap-wrap { position: absolute; bottom: 12px; right: 12px; background: rgba(10, 8, 20, 0.85);
+    border: 1px solid #c9a227; border-radius: 8px; padding: 6px 8px 8px; }
+  #minimap-wrap .cap { font-size: 11px; letter-spacing: 2px; color: #c9a227; text-align: center; margin-bottom: 3px; }
+  #minimap { display: block; border-radius: 6px; background: #0d0d18; }
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(5, 4, 12, 0.72); z-index: 5; }
+  .card { max-width: 640px; margin: 16px; padding: 28px 34px; text-align: center;
+    background: rgba(16, 12, 28, 0.94); border: 2px solid #c9a227; border-radius: 14px;
+    box-shadow: 0 0 60px rgba(201, 162, 39, 0.25); }
+  .card h1 { margin: 0 0 4px; font-size: 40px; letter-spacing: 3px; color: #ffd700; }
+  .card h2 { margin: 0 0 10px; font-size: 19px; font-weight: normal; color: #e8c85a; font-style: italic; }
+  .card p { font-size: 15px; line-height: 1.55; margin: 8px 0; }
+  .card .rules { text-align: left; font-size: 14px; line-height: 1.7; background: rgba(0,0,0,0.35);
+    border: 1px solid #5a4a2a; border-radius: 8px; padding: 10px 16px; margin: 12px 0; }
+  .card button { pointer-events: auto; cursor: pointer; font-family: inherit; font-size: 19px; font-weight: bold;
+    letter-spacing: 2px; color: #14101c; background: linear-gradient(#ffe27a, #c9a227);
+    border: none; border-radius: 10px; padding: 12px 30px; margin-top: 10px; }
+  .card button:hover { filter: brightness(1.12); }
+  #win-grade { font-size: 56px; color: #2dff7a; margin: 4px 0; letter-spacing: 6px; }
+  #lose-title { color: #ff2a2a; }
+  .small { font-size: 13px; color: #b8b0a2; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game" aria-label="Museum Malam: Mahkota Firaun — curi 3 artefak dan kabur lewat EXIT"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud">
+  <div id="hud-top-left" class="panel">
+    <div>◆ <b id="hud-loot">0/3 Artefak</b></div>
+    <div>◷ <span id="hud-time">00:00</span></div>
+    <div>◎ <span id="hud-decoy">Koin: 3</span></div>
+    <div><span id="hud-strike">Ketahuan: ○○○</span></div>
+  </div>
+  <div id="hud-alarm" class="panel">
+    <div class="label"><span>ALARM</span><span id="alarm-label">AMAN</span></div>
+    <div id="alarm-bar"><div id="alarm-fill"></div></div>
+  </div>
+  <div id="hud-guards" class="panel">Satpam Rudi · Satpam Sari · Satpam Budi · Satpam Dewi · Anjing K-9 Rex</div>
+  <div id="hud-mute">Suara: HIDUP (M)</div>
+  <div id="banner"></div>
+  <div id="hud-hint" class="panel">WASD gerak · Shift mengendap · E ambil · Q koin pengalih · M suara</div>
+  <div id="minimap-wrap">
+    <div class="cap">DENAH MUSEUM</div>
+    <canvas id="minimap" width="220" height="140"></canvas>
+  </div>
+</div>
+
+<div id="screen-title" class="screen" style="display:flex">
+  <div class="card">
+    <h1>MUSEUM MALAM</h1>
+    <h2>Mahkota Firaun — Heist Game</h2>
+    <p>Tengah malam di museum. Mahkota Firaun, Topeng Emas Anubis, dan Prasasti Batu Nil
+    menunggu di pedestal — dijaga 4 satpam, seekor anjing K-9, dan 2 kamera CCTV.
+    Lampu sorot panggung menyapu aula; etalase kaca dan sudut gelap adalah sahabatmu.</p>
+    <div class="rules">
+      <b>GOAL:</b> Curi <b>3 artefak</b>, lalu kabur lewat <b>EXIT</b> selatan.<br>
+      <b>MENANG:</b> 3/3 loot + sampai EXIT. <b>KALAH:</b> ketahuan 3 kali.<br>
+      <b>GERAK:</b> WASD / panah &nbsp;·&nbsp; <b>Shift</b> mengendap (lebih pelan, lebih sulit terlihat)<br>
+      <b>E</b> ambil artefak &nbsp;·&nbsp; <b>Q</b> lempar koin pengalih (3x, memancing penjaga)<br>
+      <b>M</b> suara &nbsp;·&nbsp; <b>P</b> jeda &nbsp;·&nbsp; <b>R</b> ulang<br>
+      Kerucut kuning = patroli, oranye (?) = curiga, merah (!) = mengejar. Alarm naik saat
+      terlihat — sembunyi di sudut gelap untuk menurunkannya.
+    </div>
+    <button id="btn-start">▶ &nbsp;MULAI MENCURI</button>
+    <p class="small" id="title-best">Belum ada rekor — jadilah pencuri pertama!</p>
+  </div>
+</div>
+
+<div id="screen-win" class="screen">
+  <div class="card">
+    <h1>KABUR BERHASIL!</h1>
+    <div id="win-grade">GRADE S</div>
+    <p id="win-stats"></p>
+    <p>Mahkota Firaun kini milikmu. Museum baru sadar saat fajar — terlambat.</p>
+    <button id="btn-again-win">↻ &nbsp;MAIN LAGI</button>
+    <p class="small">Tekan R atau Enter untuk mengulang.</p>
+  </div>
+</div>
+
+<div id="screen-lose" class="screen">
+  <div class="card">
+    <h1 id="lose-title">TERTANGKAP!</h1>
+    <p id="lose-stats"></p>
+    <p>Lampu sorot menemukanmu. Satpam Rudi tersenyum: “Museum tutup, Nak.”</p>
+    <button id="btn-again-lose">↻ &nbsp;COBA LAGI</button>
+    <p class="small">Tekan R atau Enter untuk mengulang.</p>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
